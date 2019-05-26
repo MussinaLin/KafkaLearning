@@ -40,6 +40,7 @@ public class ProducerDemoWithCallback {
 
 
         //flush and close
+        logger.info("close");
         producer.close();
     }
 }
