@@ -6,6 +6,7 @@
 
     <groupId>com.mussina.self</groupId>
     <artifactId>kafka-course</artifactId>
+    <packaging>pom</packaging>
     <version>1.0</version>
     <build>
         <plugins>
@@ -19,6 +20,10 @@
             </plugin>
         </plugins>
     </build>
+    <modules>
+        <module>kafka-basic</module>
+        <module>kafka-twitter-producer</module>
+    </modules>
 
     <dependencies>
         <dependency>
