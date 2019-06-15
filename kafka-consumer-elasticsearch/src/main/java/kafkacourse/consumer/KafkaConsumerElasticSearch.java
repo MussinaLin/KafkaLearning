@@ -1,5 +1,6 @@
 package kafkacourse.consumer;
 
+import com.google.gson.JsonParser;
 import kafkacourse.consumer.util.ElasticSearchConstant;
 import org.apache.http.HttpHost;
 import org.apache.http.auth.AuthScope;
@@ -30,26 +31,28 @@ import java.util.Properties;
 public class KafkaConsumerElasticSearch {
 
     public static Logger logger = LoggerFactory.getLogger(KafkaConsumerElasticSearch.class);
+    public static JsonParser jsonParser = new JsonParser();
+
     public static void main(String[] args) throws IOException {
         RestHighLevelClient client = createClient();
-
-
         KafkaConsumer<String, String> consumer = createConsumer("twitter_tweets");
         // poll
         while (true){
             ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(200));
             for(ConsumerRecord<String, String> record : records){
+
+                String id = extractIdFromTweet(record.value());
+
                 // insert data to elastic-search
                 String jsonString = record.value();
-                IndexRequest indexRequest = new IndexRequest("twitter", "tweet")
+                IndexRequest indexRequest = new IndexRequest("twitter", "tweet", id)// id make consumer idempotent
                     .source(jsonString, XContentType.JSON);
 
                 IndexResponse indexResponse = client.index(indexRequest, RequestOptions.DEFAULT);
-                String id = indexResponse.getId();
-                logger.info("id:" + id);
+                logger.info("id:" + indexResponse.getId());
 
                 try {
-                    Thread.sleep(1000);
+                    Thread.sleep(200);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
@@ -93,5 +96,9 @@ public class KafkaConsumerElasticSearch {
         // subscribe
         consumer.subscribe(Collections.singleton(topic));
         return consumer;
+    }
+
+    private static String extractIdFromTweet(String json){
+        return jsonParser.parse(json).getAsJsonObject().get("id_str").getAsString();
     }
 }
