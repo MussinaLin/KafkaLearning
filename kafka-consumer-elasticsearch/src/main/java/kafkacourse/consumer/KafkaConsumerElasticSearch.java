@@ -24,7 +24,7 @@ public class KafkaConsumerElasticSearch {
     public static Logger logger = LoggerFactory.getLogger(KafkaConsumerElasticSearch.class);
     public static void main(String[] args) throws IOException {
         RestHighLevelClient client = createClient();
-        String jsonString = "\"foo\":\"bar\"";
+        String jsonString = "{\"foo\":\"bar\"}";
         IndexRequest indexRequest = new IndexRequest("twitter", "tweet")
             .source(jsonString, XContentType.JSON);
 
