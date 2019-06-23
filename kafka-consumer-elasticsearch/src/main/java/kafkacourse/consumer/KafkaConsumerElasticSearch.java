@@ -13,6 +13,8 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.elasticsearch.action.bulk.BulkRequest;
+import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.client.RequestOptions;
@@ -40,28 +42,30 @@ public class KafkaConsumerElasticSearch {
         while (true){
             ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(200));
 
-            logger.info("Got record:{}", records.count());
+            int numGet = records.count();
+            logger.info("Got record:{}", numGet);
+            BulkRequest bulkRequest = new BulkRequest();
             for(ConsumerRecord<String, String> record : records){
 
-                String id = extractIdFromTweet(record.value());
+                try{
+                    String id = extractIdFromTweet(record.value());
 
-                // insert data to elastic-search
-                String jsonString = record.value();
-                IndexRequest indexRequest = new IndexRequest("twitter", "tweet", id)// id make consumer idempotent
-                    .source(jsonString, XContentType.JSON);
+                    // insert data to elastic-search
+                    String jsonString = record.value();
+                    IndexRequest indexRequest = new IndexRequest("twitter", "tweet", id)// id make consumer idempotent
+                        .source(jsonString, XContentType.JSON);
 
-                IndexResponse indexResponse = client.index(indexRequest, RequestOptions.DEFAULT);
-                logger.info("id:" + indexResponse.getId());
-
-                try {
-                    Thread.sleep(200);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
+                    bulkRequest.add(indexRequest);
+                }catch (NullPointerException e){
+                    logger.warn("skip bad data:{}", record.value());
                 }
             }
+            if(numGet > 0){
+                BulkResponse bulkResponse = client.bulk(bulkRequest, RequestOptions.DEFAULT);
+                logger.info("process succ");
+                consumer.commitSync();
+            }
 
-            logger.info("process succ");
-            consumer.commitSync();
         }
 
 //        client.close();
@@ -97,7 +101,7 @@ public class KafkaConsumerElasticSearch {
         properties.setProperty(ConsumerConfig.GROUP_ID_CONFIG, groupID);
         properties.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         properties.setProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
-        properties.setProperty(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "10");
+        properties.setProperty(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "100");
         // create consumer
         KafkaConsumer<String, String> consumer = new KafkaConsumer<>(properties);
         // subscribe
